@@ -1,0 +1,5 @@
+export enum UserRole {
+  INTERNAL_USER = 'INTERNAL_USER',
+  PORTAL_USER = 'PORTAL_USER',
+  PUBLIC_USER = 'PUBLIC_USER',
+}
