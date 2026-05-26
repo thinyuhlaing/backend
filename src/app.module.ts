@@ -10,6 +10,7 @@ import { UsersModule } from './users/users.module';
 import { ProductPricelistsModule } from './product-pricelists/product-pricelists.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 import { DeliveryMethodsModule } from './delivery-methods/delivery-methods.module';
+import { SimpleProductsModule } from './simple-products/simple-products.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { DeliveryMethodsModule } from './delivery-methods/delivery-methods.modul
     ProductCategoriesModule,
     AuthModule,
     UsersModule,
+    SimpleProductsModule,
     // ProductPricelistsModule,
     // PaymentMethodsModule,
     // DeliveryMethodsModule,
