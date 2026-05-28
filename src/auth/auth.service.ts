@@ -16,7 +16,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 type TokenType = 'access' | 'refresh';
 
 interface JwtPayload {
-  sub: string;
+  sub: number;
   role: UserRole;
   type: TokenType;
   exp: number;
@@ -83,7 +83,7 @@ export class AuthService {
     };
   }
 
-  async logout(userId: string): Promise<{ success: true }> {
+  async logout(userId: number): Promise<{ success: true }> {
     await this.usersService.clearRefreshToken(userId);
     return { success: true };
   }

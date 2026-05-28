@@ -66,7 +66,7 @@ export class UsersRepository {
     return rows.map((row) => this.mapJoinedRow(row));
   }
 
-  async findOne(id: string): Promise<UserWithPassword | null> {
+  async findOne(id: number): Promise<UserWithPassword | null> {
     const [row] = await this.db
       .select({
         user: users,
@@ -92,12 +92,12 @@ export class UsersRepository {
     return row ? this.mapJoinedRow(row) : null;
   }
 
-  async findById(id: string): Promise<UserWithPassword | null> {
+  async findById(id: number): Promise<UserWithPassword | null> {
     return this.findOne(id);
   }
 
   async update(
-    id: string,
+    id: number,
     dto: UpdateUserDto & { password?: string },
   ): Promise<UserWithPassword | null> {
     return this.db.transaction(async (tx) => {
@@ -175,7 +175,7 @@ export class UsersRepository {
     return this.create(values);
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     const deleted = await this.db
       .delete(users)
       .where(eq(users.id, id))
@@ -185,7 +185,7 @@ export class UsersRepository {
   }
 
   async updateRefreshTokenHash(
-    id: string,
+    id: number,
     refreshTokenHash: string | null,
   ): Promise<void> {
     await this.db

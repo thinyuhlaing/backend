@@ -9,8 +9,8 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProductPricelistsModule } from './product-pricelists/product-pricelists.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
-import { DeliveryMethodsModule } from './delivery-methods/delivery-methods.module';
 import { SimpleProductsModule } from './simple-products/simple-products.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
   imports: [
@@ -25,6 +25,7 @@ import { SimpleProductsModule } from './simple-products/simple-products.module';
     AuthModule,
     UsersModule,
     SimpleProductsModule,
+    OrdersModule,
     // ProductPricelistsModule,
     // PaymentMethodsModule,
     // DeliveryMethodsModule,
