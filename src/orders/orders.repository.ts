@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE_DB_PROVIDER } from '../database/database.constants';
-import { profiles } from '../users/schema/profiles.schema';
+import { user_profiles } from '../users/schema/user_profiles.schema';
 import { users } from '../users/schema/users.schema';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderDto } from './dto/update-order.dto';
@@ -36,11 +36,11 @@ export class OrdersRepository {
       .select({
         order: orders,
         customer: users,
-        profile: profiles,
+        profile: user_profiles,
       })
       .from(orders)
       .innerJoin(users, eq(users.id, orders.customerId))
-      .leftJoin(profiles, eq(profiles.userId, users.id))
+      .leftJoin(user_profiles, eq(user_profiles.userId, users.id))
       .where(eq(orders.isArchived, false))
       .orderBy(desc(orders.id));
 
@@ -52,11 +52,11 @@ export class OrdersRepository {
       .select({
         order: orders,
         customer: users,
-        profile: profiles,
+        profile: user_profiles,
       })
       .from(orders)
       .innerJoin(users, eq(users.id, orders.customerId))
-      .leftJoin(profiles, eq(profiles.userId, users.id))
+      .leftJoin(user_profiles, eq(user_profiles.userId, users.id))
       .where(and(eq(orders.id, id), eq(orders.isArchived, false)));
 
     return order ? this.mapJoinedRow(order) : null;
@@ -112,7 +112,7 @@ export class OrdersRepository {
   private mapJoinedRow(row: {
     order: typeof orders.$inferSelect;
     customer: typeof users.$inferSelect;
-    profile: typeof profiles.$inferSelect | null;
+    profile: typeof user_profiles.$inferSelect | null;
   }): Order {
     return {
       ...this.map(row.order),

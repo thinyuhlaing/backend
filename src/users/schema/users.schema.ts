@@ -1,10 +1,20 @@
-import { pgEnum, pgTable, serial, timestamp, varchar } from 'drizzle-orm/pg-core';
+import {
+  pgEnum,
+  pgTable,
+  serial,
+  timestamp,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { UserRole } from '../enums/user-role.enum';
-
+import { UserStatus } from '../enums/user-status.enum';
 export const userRoleEnum = pgEnum('user_role', [
   UserRole.INTERNAL_USER,
   UserRole.PORTAL_USER,
   UserRole.PUBLIC_USER,
+]);
+export const userStatusEnum = pgEnum('status', [
+  UserStatus.ACTIVE,
+  UserStatus.INACTIVE,
 ]);
 
 export const users = pgTable('users', {
@@ -13,6 +23,7 @@ export const users = pgTable('users', {
   password: varchar('password', { length: 255 }).notNull(),
   refreshTokenHash: varchar('refresh_token_hash', { length: 255 }),
   userRole: userRoleEnum('user_role').notNull(),
+  status: userStatusEnum('status').default(UserStatus.ACTIVE).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
     .notNull(),
