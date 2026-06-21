@@ -4,8 +4,9 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { hashPassword } from './password.util';
 import { UserRole } from './enums/user-role.enum';
-import { profiles } from './schema/profiles.schema';
+import { user_profiles } from './schema/user_profiles.schema';
 import { users } from './schema/users.schema';
+import { UserStatus } from './enums/user-status.enum';
 
 config({ path: '.env' });
 
@@ -25,6 +26,8 @@ async function seedAdmin() {
   const adminRole =
     (process.env.ADMIN_USER_ROLE as UserRole | undefined) ??
     UserRole.INTERNAL_USER;
+  const adminStatus =
+    (process.env.ADMIN_STATUS as UserStatus | undefined) ?? UserStatus.ACTIVE;
 
   if (!adminName || !adminEmail || !adminPassword) {
     throw new Error('Missing admin seed env variables');
@@ -35,10 +38,10 @@ async function seedAdmin() {
   const [existing] = await db
     .select({
       user: users,
-      profile: profiles,
+      profile: user_profiles,
     })
     .from(users)
-    .innerJoin(profiles, eq(profiles.userId, users.id))
+    .innerJoin(user_profiles, eq(user_profiles.userId, users.id))
     .where(eq(users.login, adminEmail));
 
   if (existing) {
@@ -52,12 +55,12 @@ async function seedAdmin() {
         .where(eq(users.id, existing.user.id));
 
       await tx
-        .update(profiles)
+        .update(user_profiles)
         .set({
           name: adminName,
           email: adminEmail,
         })
-        .where(eq(profiles.userId, existing.user.id));
+        .where(eq(user_profiles.userId, existing.user.id));
     });
 
     console.log(`Updated admin user: ${adminEmail}`);
@@ -68,11 +71,12 @@ async function seedAdmin() {
         .values({
           login: adminEmail,
           password,
+          status: adminStatus,
           userRole: adminRole,
         })
         .returning();
 
-      await tx.insert(profiles).values({
+      await tx.insert(user_profiles).values({
         userId: user.id,
         name: adminName,
         email: adminEmail,

@@ -5,12 +5,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { UserRole } from 'src/users/enums/user-role.enum';
+import { UserStatus } from 'src/users/enums/user-status.enum';
 import { User } from 'src/users/interfaces/user.interface';
 import { verifyHashedSecret, verifyPassword } from 'src/users/password.util';
 import { UsersService } from 'src/users/users.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 type TokenType = 'access' | 'refresh';
@@ -39,10 +40,14 @@ export class AuthService {
     private readonly configService: ConfigService,
   ) {}
 
-  async register(dto: CreateUserDto): Promise<AuthResponse> {
+  async register(dto: RegisterDto): Promise<AuthResponse> {
     await this.ensureLoginAvailable(dto.login);
 
-    const user = await this.usersService.create(dto);
+    const user = await this.usersService.create({
+      ...dto,
+      userRole: UserRole.PORTAL_USER,
+      status: UserStatus.ACTIVE,
+    });
     const tokens = await this.issueTokens(user);
 
     return {

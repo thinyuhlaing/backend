@@ -1,7 +1,13 @@
-import { integer, pgTable, serial, timestamp, varchar } from 'drizzle-orm/pg-core';
+import {
+  integer,
+  pgTable,
+  serial,
+  timestamp,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import { users } from './users.schema';
 
-export const profiles = pgTable('profiles', {
+export const user_profiles = pgTable('user_profiles', {
   id: serial('id').primaryKey(),
   userId: integer('user_id')
     .notNull()
@@ -10,7 +16,7 @@ export const profiles = pgTable('profiles', {
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull(),
   phone: varchar('phone', { length: 50 }),
-  avatarUrl: varchar('avatar_url', { length: 500 }),
+  // avatarUrl: varchar('avatar_url', { length: 500 }),
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
     .notNull(),

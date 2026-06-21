@@ -6,7 +6,7 @@ import {
 import { hashPassword, hashSecret } from './password.util';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { User, UserWithPassword } from './interfaces/user.interface';
+import { User, UserWithPassword, UserList } from './interfaces/user.interface';
 import { UsersRepository } from './users.repository';
 
 @Injectable()
@@ -24,9 +24,9 @@ export class UsersService {
     return this.sanitizeUser(user);
   }
 
-  async findAll(): Promise<User[]> {
+  async findAll(): Promise<UserList[]> {
     const users = await this.repository.findAll();
-    return users.map((user) => this.sanitizeUser(user));
+    return users;
   }
 
   async findOne(id: number): Promise<User> {
