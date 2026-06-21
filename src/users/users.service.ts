@@ -29,7 +29,7 @@ export class UsersService {
     return users.map((user) => this.sanitizeUser(user));
   }
 
-  async findOne(id: string): Promise<User> {
+  async findOne(id: number): Promise<User> {
     const user = await this.repository.findOne(id);
     if (!user) {
       throw new NotFoundException('User not found');
@@ -38,7 +38,7 @@ export class UsersService {
     return this.sanitizeUser(user);
   }
 
-  async update(id: string, dto: UpdateUserDto): Promise<User> {
+  async update(id: number, dto: UpdateUserDto): Promise<User> {
     if (dto.login !== undefined) {
       await this.ensureUniqueLogin(dto.login, id);
     }
@@ -55,7 +55,7 @@ export class UsersService {
     return this.sanitizeUser(user);
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     const deleted = await this.repository.remove(id);
     if (!deleted) {
       throw new NotFoundException('User not found');
@@ -68,15 +68,15 @@ export class UsersService {
     return this.repository.findByLogin(login);
   }
 
-  async findByIdWithPassword(id: string): Promise<UserWithPassword | null> {
+  async findByIdWithPassword(id: number): Promise<UserWithPassword | null> {
     return this.repository.findById(id);
   }
 
-  async storeRefreshToken(id: string, refreshToken: string): Promise<void> {
+  async storeRefreshToken(id: number, refreshToken: string): Promise<void> {
     await this.repository.updateRefreshTokenHash(id, hashSecret(refreshToken));
   }
 
-  async clearRefreshToken(id: string): Promise<void> {
+  async clearRefreshToken(id: number): Promise<void> {
     await this.repository.updateRefreshTokenHash(id, null);
   }
 
@@ -91,7 +91,7 @@ export class UsersService {
 
   private async ensureUniqueLogin(
     login: string,
-    currentUserId?: string,
+    currentUserId?: number,
   ): Promise<void> {
     const existingUser = await this.repository.findByLogin(login);
 
