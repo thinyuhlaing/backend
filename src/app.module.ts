@@ -9,7 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { ProductPricelistsModule } from './product-pricelists/product-pricelists.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
-import { SimpleProductsModule } from './simple-products/simple-products.module';
+// import { SimpleProductsModule } from './simple-products/simple-products.module';
 import { OrdersModule } from './orders/orders.module';
 
 @Module({
@@ -24,7 +24,7 @@ import { OrdersModule } from './orders/orders.module';
     ProductCategoriesModule,
     AuthModule,
     UsersModule,
-    SimpleProductsModule,
+    // SimpleProductsModule,
     OrdersModule,
     // ProductPricelistsModule,
     // PaymentMethodsModule,
@@ -33,4 +33,4 @@ import { OrdersModule } from './orders/orders.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
