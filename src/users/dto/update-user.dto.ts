@@ -1,21 +1,35 @@
+import { Transform, Type } from 'class-transformer';
 import {
   IsEnum,
+  IsIn,
+  IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
+  Min,
   MinLength,
 } from 'class-validator';
 import { UserRole } from '../enums/user-role.enum';
-import { UserStatus } from '../enums/user-status.enum';
+
+const GMAIL_LOGIN_PATTERN = /^[A-Za-z0-9._%+-]+@gmail\.com$/;
 
 export class UpdateUserDto {
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MinLength(1)
-  @Matches(/^[A-Za-z0-9._%+-]+@gmail\.com$/, {
+  @Matches(GMAIL_LOGIN_PATTERN, {
     message: 'login must be a valid Gmail address ending in @gmail.com',
   })
   login?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @Matches(GMAIL_LOGIN_PATTERN, {
+    message: 'email must be a valid Gmail address ending in @gmail.com',
+  })
+  email?: string;
 
   @IsOptional()
   @IsString()
@@ -27,8 +41,8 @@ export class UpdateUserDto {
   userRole?: UserRole;
 
   @IsOptional()
-  @IsEnum(UserStatus)
-  status?: UserStatus;
+  @IsIn(['Active', 'Inactive'])
+  status?: string;
 
   @IsOptional()
   @IsString()
@@ -42,4 +56,20 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   avatarUrl?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  walletAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  paymentType?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  vipLevel?: number;
 }

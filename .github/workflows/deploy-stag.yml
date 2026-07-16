@@ -1,0 +1,65 @@
+name: Deploy AscendCart Staging
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout repo
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Build Next.js app
+      - name: Build Next.js
+        run: npm run build
+
+      # 5. Setup SSH
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add SSH known hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Copy all custom modules to VPS
+        run: |
+          rsync -avz --delete \
+            --exclude 'pgdata_stag' \
+            ./ \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/ascendcart_stag/backend_stag
+
+      # 6. Deploy source code and Docker configs to server
+      - name: Deploy source and Docker configs
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cp /home/docker_config/Dockerfile.nestjs /home/ascendcart_stag/backend_stag/Dockerfile
+            cp /home/docker_config/docker-compose.nest.stag.yml /home/ascendcart_stag/backend_stag/docker-compose.yml
+          EOF
+
+      # 7. Build and restart server
+      - name: Restart Build npm
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd /home/ascendcart_stag/backend_stag
+            docker compose build --no-cache
+            docker compose down
+            docker compose up -d
+          EOF

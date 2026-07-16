@@ -1,17 +1,34 @@
 import { Injectable } from '@nestjs/common';
-import { AbstractBaseService } from '../common/base/base.service';
 import { CreatePaymentMethodDto } from './dto/create-payment-method.dto';
 import { UpdatePaymentMethodDto } from './dto/update-payment-method.dto';
-import { PaymentMethod } from './interfaces/payment-method.interface';
 import { PaymentMethodsRepository } from './payment-methods.repository';
 
 @Injectable()
-export class PaymentMethodsService extends AbstractBaseService<
-  PaymentMethod,
-  CreatePaymentMethodDto,
-  UpdatePaymentMethodDto
-> {
-  constructor(paymentMethodRepository: PaymentMethodsRepository) {
-    super(paymentMethodRepository);
+export class PaymentMethodsService {
+  constructor(private readonly paymentMethodRepository: PaymentMethodsRepository) {}
+
+  create(dto: CreatePaymentMethodDto) {
+    return this.paymentMethodRepository.create(dto);
+  }
+
+  findAll() {
+    return this.paymentMethodRepository.findAll();
+  }
+
+  findOne(id: number) {
+    return this.paymentMethodRepository.findOne(id);
+  }
+
+  update(id: number, dto: UpdatePaymentMethodDto) {
+    return this.paymentMethodRepository.update(id, dto);
+  }
+
+  async remove(id: number) {
+    await this.paymentMethodRepository.remove(id);
+    return { deleted: true };
+  }
+
+  findActiveByCode(code: string) {
+    return this.paymentMethodRepository.findActiveByCode(code);
   }
 }

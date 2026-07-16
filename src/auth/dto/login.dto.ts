@@ -1,9 +1,12 @@
+import { Transform } from 'class-transformer';
 import { IsString, Matches, MinLength } from 'class-validator';
 
+const GMAIL_LOGIN_PATTERN = /^[A-Za-z0-9._%+-]+@gmail\.com$/;
+
 export class LoginDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
-  @MinLength(1)
-  @Matches(/^[A-Za-z0-9._%+-]+@gmail\.com$/, {
+  @Matches(GMAIL_LOGIN_PATTERN, {
     message: 'login must be a valid Gmail address ending in @gmail.com',
   })
   login: string;

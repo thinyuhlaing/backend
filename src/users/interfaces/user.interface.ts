@@ -1,15 +1,20 @@
 import { UserRole } from '../enums/user-role.enum';
-import { UserStatus } from '../enums/user-status.enum';
 
 export interface User {
   id: number;
+  profileId?: number;
   login: string;
+  isVerified: boolean;
   userRole: UserRole;
-  status: UserStatus;
+  status: string;
   name: string;
   email: string;
   phone: string | null;
-  // avatarUrl: string | null;
+  avatarUrl: string | null;
+  walletAmount: number;
+  paymentType: string | null;
+  vipLevel: number;
+  emailVerifiedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,12 +22,11 @@ export interface User {
 export interface UserWithPassword extends User {
   password: string;
   refreshTokenHash: string | null;
+  emailVerificationTokenHash: string | null;
+  emailVerificationTokenExpiresAt: Date | null;
 }
 
-export interface UserList {
+export interface Member extends Omit<User, 'id'> {
   id: number;
-  userRole: UserRole;
-  status: UserStatus;
-  login: string;
-  name: string;
+  userId: number;
 }

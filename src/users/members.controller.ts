@@ -16,22 +16,15 @@ import type { Request } from 'express';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { RolesGuard } from 'src/auth/roles.guard';
-import { CreateUserDto } from './dto/create-user.dto';
+import { CreateMemberDto } from './dto/create-member.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserRole } from './enums/user-role.enum';
 import type { User } from './interfaces/user.interface';
 import { UsersService } from './users.service';
 
-@Controller('users')
-export class UsersController {
+@Controller('members')
+export class MembersController {
   constructor(private readonly usersService: UsersService) {}
-
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(UserRole.INTERNAL_USER)
-  @Post()
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
-  }
 
   @Get()
   findAll(
@@ -44,13 +37,19 @@ export class UsersController {
       limit: limit ? Number(limit) : undefined,
       q: q ?? undefined,
     };
-
-    return this.usersService.findAll(opts);
+    return this.usersService.findMembers(opts);
   }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.findOne(id);
+    return this.usersService.findMember(id);
+  }
+
+  // @UseGuards(AuthGuard, RolesGuard)
+  // @Roles(UserRole.INTERNAL_USER)
+  @Post()
+  create(@Body() dto: CreateMemberDto) {
+    return this.usersService.createMember(dto);
   }
 
   // @UseGuards(AuthGuard)
@@ -64,11 +63,11 @@ export class UsersController {
     //   throw new ForbiddenException('Only Admin can update or reset passwords');
     // }
 
-    return this.usersService.update(id, dto);
+    return this.usersService.updateMember(id, dto);
   }
 
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.remove(id);
+    return this.usersService.removeMember(id);
   }
 }

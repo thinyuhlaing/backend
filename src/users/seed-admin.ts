@@ -4,9 +4,8 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { hashPassword } from './password.util';
 import { UserRole } from './enums/user-role.enum';
-import { user_profiles } from './schema/user_profiles.schema';
+import { profiles } from './schema/profiles.schema';
 import { users } from './schema/users.schema';
-import { UserStatus } from './enums/user-status.enum';
 
 config({ path: '.env' });
 
@@ -26,8 +25,6 @@ async function seedAdmin() {
   const adminRole =
     (process.env.ADMIN_USER_ROLE as UserRole | undefined) ??
     UserRole.INTERNAL_USER;
-  const adminStatus =
-    (process.env.ADMIN_STATUS as UserStatus | undefined) ?? UserStatus.ACTIVE;
 
   if (!adminName || !adminEmail || !adminPassword) {
     throw new Error('Missing admin seed env variables');
@@ -38,10 +35,10 @@ async function seedAdmin() {
   const [existing] = await db
     .select({
       user: users,
-      profile: user_profiles,
+      profile: profiles,
     })
     .from(users)
-    .innerJoin(user_profiles, eq(user_profiles.userId, users.id))
+    .innerJoin(profiles, eq(profiles.userId, users.id))
     .where(eq(users.login, adminEmail));
 
   if (existing) {
@@ -50,17 +47,19 @@ async function seedAdmin() {
         .update(users)
         .set({
           password,
+          isVerified: true,
+          emailVerifiedAt: existing.user.emailVerifiedAt ?? new Date(),
           userRole: adminRole,
         })
         .where(eq(users.id, existing.user.id));
 
       await tx
-        .update(user_profiles)
+        .update(profiles)
         .set({
           name: adminName,
           email: adminEmail,
         })
-        .where(eq(user_profiles.userId, existing.user.id));
+        .where(eq(profiles.userId, existing.user.id));
     });
 
     console.log(`Updated admin user: ${adminEmail}`);
@@ -71,12 +70,13 @@ async function seedAdmin() {
         .values({
           login: adminEmail,
           password,
-          status: adminStatus,
+          isVerified: true,
+          emailVerifiedAt: new Date(),
           userRole: adminRole,
         })
-        .returning();
+        .returning({ id: users.id });
 
-      await tx.insert(user_profiles).values({
+      await tx.insert(profiles).values({
         userId: user.id,
         name: adminName,
         email: adminEmail,

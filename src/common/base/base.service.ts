@@ -1,8 +1,12 @@
 import { NotFoundException } from '@nestjs/common';
-import { AbstractBaseRepositoryContract } from './base.repository';
 
-export type AbstractBaseRepository<Entity, CreateDto, UpdateDto> =
-  AbstractBaseRepositoryContract<Entity, CreateDto, UpdateDto>;
+export interface AbstractBaseRepository<Entity, CreateDto, UpdateDto> {
+  create(dto: CreateDto): Promise<Entity> | Entity;
+  findAll(): Promise<Entity[]> | Entity[];
+  findOne(id: number): Promise<Entity | null> | Entity | null;
+  update(id: number, dto: UpdateDto): Promise<Entity | null> | Entity | null;
+  remove(id: number): Promise<boolean> | boolean;
+}
 
 export abstract class AbstractBaseService<Entity, CreateDto, UpdateDto> {
   constructor(

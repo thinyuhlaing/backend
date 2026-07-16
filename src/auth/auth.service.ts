@@ -1,17 +1,23 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
+import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { UserRole } from 'src/users/enums/user-role.enum';
-import { UserStatus } from 'src/users/enums/user-status.enum';
-import { User } from 'src/users/interfaces/user.interface';
+import type { User } from 'src/users/interfaces/user.interface';
 import { verifyHashedSecret, verifyPassword } from 'src/users/password.util';
 import { UsersService } from 'src/users/users.service';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
+import { EmailService } from './email.service';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 type TokenType = 'access' | 'refresh';
@@ -33,26 +39,74 @@ export interface AuthResponse extends AuthTokens {
   user: User;
 }
 
+export interface PendingRegistrationResponse {
+  success: true;
+  requiresEmailVerification: true;
+  message: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
-  ) {}
+    private readonly emailService: EmailService,
+  ) { }
 
-  async register(dto: RegisterDto): Promise<AuthResponse> {
+  async register(
+    dto: CreateUserDto,
+  ): Promise<AuthResponse | PendingRegistrationResponse> {
     await this.ensureLoginAvailable(dto.login);
+    this.emailService.ensureSmtpConfigured();
 
-    const user = await this.usersService.create({
+    const emailVerificationToken = randomBytes(32).toString('hex');
+
+    await this.usersService.create({
       ...dto,
-      userRole: UserRole.PORTAL_USER,
-      status: UserStatus.ACTIVE,
+      emailVerificationToken: this.hashEmailVerificationToken(
+        emailVerificationToken,
+      ),
     });
-    const tokens = await this.issueTokens(user);
+
+    await this.emailService.sendVerificationEmail({
+      to: dto.login,
+      name: dto.name,
+      verificationUrl: this.buildVerificationUrl(dto, emailVerificationToken),
+    });
+
+    return {
+      success: true,
+      requiresEmailVerification: true,
+      message: 'Please verify your email address to activate your account.',
+    };
+  }
+
+  async verifyEmail(token?: string): Promise<AuthResponse> {
+    if (!token) {
+      throw new BadRequestException('Verification token is required');
+    }
+
+    const user = await this.usersService.findByVerificationTokenHash(
+      this.hashEmailVerificationToken(token),
+    );
+
+    if (!user) {
+      throw new BadRequestException('Invalid verification token');
+    }
+
+    if (
+      !user.emailVerificationTokenExpiresAt ||
+      user.emailVerificationTokenExpiresAt.getTime() <= Date.now()
+    ) {
+      throw new BadRequestException('Verification token has expired');
+    }
+
+    const verifiedUser = await this.usersService.markEmailVerified(user.id);
+    const tokens = await this.issueTokens(verifiedUser);
 
     return {
       ...tokens,
-      user,
+      user: verifiedUser,
     };
   }
 
@@ -73,6 +127,10 @@ export class AuthService {
 
     if (!user || !user.refreshTokenHash) {
       throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (this.isInactiveUser(user.status)) {
+      throw new UnauthorizedException('Account is inactive');
     }
 
     if (!verifyHashedSecret(dto.refreshToken, user.refreshTokenHash)) {
@@ -101,6 +159,10 @@ export class AuthService {
       throw new UnauthorizedException('Authentication required');
     }
 
+    if (this.isInactiveUser(user.status)) {
+      throw new UnauthorizedException('Account is inactive');
+    }
+
     return this.usersService.sanitizeUser(user);
   }
 
@@ -115,6 +177,11 @@ export class AuthService {
     const payload = JSON.parse(
       Buffer.from(encodedPayload, 'base64url').toString('utf8'),
     ) as JwtPayload;
+
+    if (!Number.isInteger(payload.sub)) {
+      throw new UnauthorizedException('Invalid authentication token');
+    }
+
     const expectedSignature = this.sign(unsignedToken, payload.type);
 
     const signatureBuffer = Buffer.from(signature);
@@ -153,7 +220,21 @@ export class AuthService {
       throw new UnauthorizedException('Invalid login or password');
     }
 
+    if (this.isInactiveUser(user.status)) {
+      throw new UnauthorizedException('Account is inactive');
+    }
+
+    if (!user.isVerified && !user.emailVerifiedAt) {
+      throw new UnauthorizedException(
+        'Please verify your email before logging in',
+      );
+    }
+
     return user;
+  }
+
+  private isInactiveUser(status?: string | null): boolean {
+    return status?.toLowerCase() === 'inactive';
   }
 
   private async issueTokens(user: User): Promise<AuthTokens> {
@@ -194,6 +275,16 @@ export class AuthService {
     return createHmac('sha256', this.getTokenSecret(tokenType))
       .update(value)
       .digest('base64url');
+  }
+
+  private hashEmailVerificationToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private buildVerificationUrl(dto: CreateUserDto, token: string): string {
+    const baseUrl = this.configService.get<string>('FRONTEND_APP_URL') || 'http://localhost:3000';
+
+    return `${baseUrl.replace(/\/$/, '')}/auth/verify-email?token=${token}`;
   }
 
   private getTokenTtl(tokenType: TokenType): number {

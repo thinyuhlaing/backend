@@ -1,5 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { desc, eq, and } from 'drizzle-orm';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE_DB_PROVIDER } from '../database/database.constants';
 import { paymentMethods } from './schema/payment-methods.schema';
@@ -18,17 +18,19 @@ export class PaymentMethodsRepository {
 
     return {
       ...row,
-      isActive: Boolean(row.isActive), // ensure boolean safety
+      isActive: Boolean(row.isActive),
     };
   }
 
   async create(dto: CreatePaymentMethodDto) {
+    await this.ensureUniqueCode(dto.code);
+
     const [method] = await this.db
       .insert(paymentMethods)
       .values({
         name: dto.name,
         code: dto.code,
-        details: dto.details ?? null,
+        description: dto.description ?? null,
         isActive: dto.isActive ?? true,
       })
       .returning();
@@ -40,7 +42,6 @@ export class PaymentMethodsRepository {
     const rows = await this.db
       .select()
       .from(paymentMethods)
-      .where(eq(paymentMethods.isActive, true))
       .orderBy(desc(paymentMethods.id));
 
     return rows.map(this.map);
@@ -53,7 +54,22 @@ export class PaymentMethodsRepository {
       .where(
         and(
           eq(paymentMethods.id, id),
+          eq(paymentMethods.isArchived, false),
+        ),
+      );
+
+    return this.map(method);
+  }
+
+  async findActiveByCode(code: string) {
+    const [method] = await this.db
+      .select()
+      .from(paymentMethods)
+      .where(
+        and(
+          eq(paymentMethods.code, code),
           eq(paymentMethods.isActive, true),
+          eq(paymentMethods.isArchived, false),
         ),
       );
 
@@ -61,13 +77,17 @@ export class PaymentMethodsRepository {
   }
 
   async update(id: number, dto: UpdatePaymentMethodDto) {
+    if (dto.code !== undefined) {
+      await this.ensureUniqueCode(dto.code, id);
+    }
+
     const values: any = {
       updatedAt: new Date(),
     };
 
     if (dto.name !== undefined) values.name = dto.name;
     if (dto.code !== undefined) values.code = dto.code;
-    if (dto.details !== undefined) values.details = dto.details;
+    if (dto.description !== undefined) values.description = dto.description;
     if (dto.isActive !== undefined) values.isActive = dto.isActive;
 
     const [method] = await this.db
@@ -81,10 +101,28 @@ export class PaymentMethodsRepository {
 
   async remove(id: number) {
     const [deleted] = await this.db
-      .delete(paymentMethods)
+      .update(paymentMethods)
+      .set({ isArchived: true, isActive: false, updatedAt: new Date() })
       .where(eq(paymentMethods.id, id))
       .returning({ id: paymentMethods.id });
 
     return !!deleted;
+  }
+
+  private async ensureUniqueCode(code: string, currentId?: number) {
+    const filters = [eq(paymentMethods.code, code)];
+
+    if (currentId !== undefined) {
+      filters.push(ne(paymentMethods.id, currentId));
+    }
+
+    const [existing] = await this.db
+      .select({ id: paymentMethods.id })
+      .from(paymentMethods)
+      .where(and(...filters));
+
+    if (existing) {
+      throw new ConflictException('Payment type code already exists');
+    }
   }
 }

@@ -1,18 +1,22 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMinSize,
   IsDateString,
+  IsEmail,
+  IsIn,
   IsInt,
-  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { CreateOrderItemDto } from './create-order.dto';
+import type { OrderStatus } from '../interfaces/order.interface';
 
 export class UpdateOrderDto {
   @IsOptional()
   @IsString()
-  @IsNotEmpty()
   orderNumber?: string;
 
   @IsOptional()
@@ -21,17 +25,46 @@ export class UpdateOrderDto {
   customerId?: number;
 
   @IsOptional()
+  @IsString()
+  customerName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  customerEmail?: string;
+
+  @IsOptional()
   @IsDateString()
   orderDate?: string;
+
+  @IsOptional()
+  @IsIn(['Pending', 'Confirmed', 'Delivered', 'Cancelled'])
+  status?: OrderStatus;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  shippingAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentType?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  total?: number;
+  shippingAmount?: number;
 
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  status?: string;
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemDto)
+  @ArrayMinSize(1)
+  items?: CreateOrderItemDto[];
 }

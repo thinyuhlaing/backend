@@ -1,7 +1,8 @@
-import { boolean, integer, serial, timestamp } from 'drizzle-orm/pg-core';
+import { boolean, integer, timestamp } from 'drizzle-orm/pg-core';
 
 export const abstractBaseSchemaColumns = {
-  id: serial('id').primaryKey(),
+  id: integer('id').primaryKey().generatedByDefaultAsIdentity(),
+
   createdAt: timestamp('created_at', { withTimezone: true })
     .defaultNow()
     .notNull(),

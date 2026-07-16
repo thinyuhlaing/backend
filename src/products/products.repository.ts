@@ -1,28 +1,48 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { AbstractBaseRepository } from '../common/base/base.repository';
 import { DRIZZLE_DB_PROVIDER } from '../database/database.constants';
-import { productCategories } from '../product-categories/schema/product-categories.schema';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './interfaces/product.interface';
 import { products } from './schema/products.schema';
+import { productCategories } from '../product-categories/schema/product-categories.schema';
+
+type ProductRow = typeof products.$inferSelect;
 
 @Injectable()
-export class ProductsRepository extends AbstractBaseRepository<
-  Product,
-  CreateProductDto,
-  UpdateProductDto
-> {
+export class ProductsRepository {
   constructor(
     @Inject(DRIZZLE_DB_PROVIDER)
-    db: NodePgDatabase,
-  ) {
-    super(db, products);
+    private readonly db: NodePgDatabase,
+  ) { }
+
+  async create(dto: CreateProductDto) {
+    const salePrice = dto.salePrice;
+    if (salePrice === undefined || salePrice === null) {
+      throw new BadRequestException('salePrice is required');
+    }
+
+    const costPrice = dto.costPrice ?? salePrice;
+
+    const [product] = await this.db
+      .insert(products)
+      .values({
+        name: dto.name,
+        categoryId: dto.categoryId,
+        description: dto.description ?? null,
+        imageUrl: dto.imageUrl ?? null,
+        salePrice: salePrice.toString(),
+        costPrice: costPrice.toString(),
+        inStock: dto.inStock,
+        isPublished: dto.isPublished,
+      })
+      .returning();
+
+    return product;
   }
 
-  override async findAll() {
+  async findAll() {
     return await this.db
       .select({
         id: products.id,
@@ -44,58 +64,19 @@ export class ProductsRepository extends AbstractBaseRepository<
       })
       .from(products)
       .leftJoin(productCategories, eq(productCategories.id, products.categoryId))
-      .where(eq(products.isArchived, false))
       .orderBy(desc(products.id));
   }
 
-  override async findOne(id: number) {
+  async findOne(id: number) {
     const [product] = await this.db
-      .select({
-        id: products.id,
-        name: products.name,
-        categoryId: products.categoryId,
-        description: products.description,
-        imageUrl: products.imageUrl,
-        salePrice: products.salePrice,
-        costPrice: products.costPrice,
-        inStock: products.inStock,
-        isPublished: products.isPublished,
-        categoryName: productCategories.name,
-
-        createdAt: products.createdAt,
-        updatedAt: products.updatedAt,
-        createdBy: products.createdBy,
-        updatedBy: products.updatedBy,
-        isArchived: products.isArchived,
-      })
+      .select()
       .from(products)
-      .leftJoin(productCategories, eq(productCategories.id, products.categoryId))
-      .where(and(eq(products.id, id), eq(products.isArchived, false)));
+      .where(eq(products.id, id));
 
     return product ?? null;
   }
 
-  protected override toCreateValues(dto: CreateProductDto) {
-    const salePrice = dto.salePrice;
-    if (salePrice === undefined || salePrice === null) {
-      throw new BadRequestException('salePrice is required');
-    }
-
-    const costPrice = dto.costPrice ?? salePrice;
-
-    return {
-      name: dto.name,
-      categoryId: dto.categoryId,
-      description: dto.description ?? null,
-      imageUrl: dto.imageUrl ?? null,
-      salePrice: salePrice.toString(),
-      costPrice: costPrice.toString(),
-      inStock: dto.inStock,
-      isPublished: dto.isPublished,
-    };
-  }
-
-  protected override toUpdateValues(dto: UpdateProductDto) {
+  async update(id: number, dto: UpdateProductDto) {
     const values: {
       name?: string;
       categoryId?: number;
@@ -119,6 +100,21 @@ export class ProductsRepository extends AbstractBaseRepository<
     if (dto.inStock !== undefined) values.inStock = dto.inStock;
     if (dto.isPublished !== undefined) values.isPublished = dto.isPublished;
 
-    return values;
+    const [product] = await this.db
+      .update(products)
+      .set(values)
+      .where(eq(products.id, id))
+      .returning();
+
+    return product ?? null;
+  }
+
+  async remove(id: number) {
+    const deleted = await this.db
+      .delete(products)
+      .where(eq(products.id, id))
+      .returning({ id: products.id });
+
+    return deleted.length > 0;
   }
 }

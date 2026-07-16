@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DRIZZLE_DB_PROVIDER } from '../database/database.constants';
 import { CreateProductCategoryDto } from './dto/create-product-category.dto';
@@ -11,21 +11,25 @@ type ProductCategoryRow = typeof productCategories.$inferSelect;
 
 @Injectable()
 export class ProductCategoriesRepository {
+  private schemaReady?: Promise<void>;
+
   constructor(
     @Inject(DRIZZLE_DB_PROVIDER)
     private readonly db: NodePgDatabase,
-  ) {}
+  ) { }
 
   async create(dto: CreateProductCategoryDto) {
-    await this.assertValidParent(null, dto.parentId);
-    const completeName = await this.buildCompleteName(dto.name, dto.parentId);
+    await this.ensureSchema();
+    const parentId = dto.parentId ?? null;
+    await this.assertValidParent(null, parentId);
+    const completeName = await this.buildCompleteName(dto.name, parentId);
 
     const [category] = await this.db
       .insert(productCategories)
       .values({
         name: dto.name,
         completeName,
-        parentId: dto.parentId,
+        parentId,
       })
       .returning();
 
@@ -33,6 +37,7 @@ export class ProductCategoriesRepository {
   }
 
   async findAll() {
+    await this.ensureSchema();
     const categories = await this.db
       .select()
       .from(productCategories)
@@ -42,6 +47,7 @@ export class ProductCategoriesRepository {
   }
 
   async findOne(id: number) {
+    await this.ensureSchema();
     const category = await this.findRawOne(id);
 
     if (!category) {
@@ -52,6 +58,7 @@ export class ProductCategoriesRepository {
   }
 
   async update(id: number, dto: UpdateProductCategoryDto) {
+    await this.ensureSchema();
     const existingCategory = await this.findRawOne(id);
 
     if (!existingCategory) {
@@ -60,7 +67,9 @@ export class ProductCategoriesRepository {
 
     const nextName = dto.name ?? existingCategory.name;
     const nextParentId =
-      dto.parentId !== undefined ? dto.parentId : existingCategory.parentId;
+      dto.parentId !== undefined
+        ? dto.parentId
+        : this.normalizeParentId(existingCategory.parentId);
     await this.assertValidParent(id, nextParentId);
     const nextCompleteName = await this.buildCompleteName(nextName, nextParentId);
 
@@ -96,6 +105,7 @@ export class ProductCategoriesRepository {
   }
 
   async remove(id: number) {
+    await this.ensureSchema();
     const deleted = await this.db
       .delete(productCategories)
       .where(eq(productCategories.id, id))
@@ -105,6 +115,12 @@ export class ProductCategoriesRepository {
   }
 
   private async findByParentId(parentId: number): Promise<ProductCategoryRow[]> {
+    await this.ensureSchema();
+
+    if (!this.isValidId(parentId)) {
+      return [];
+    }
+
     return this.db
       .select()
       .from(productCategories)
@@ -112,6 +128,12 @@ export class ProductCategoriesRepository {
   }
 
   private async findRawOne(id: number): Promise<ProductCategoryRow | null> {
+    await this.ensureSchema();
+
+    if (!this.isValidId(id)) {
+      return null;
+    }
+
     const [category] = await this.db
       .select()
       .from(productCategories)
@@ -124,11 +146,13 @@ export class ProductCategoriesRepository {
     name: string,
     parentId: number | null,
   ): Promise<string> {
-    if (parentId == null) {
+    const normalizedParentId = this.normalizeParentId(parentId);
+
+    if (normalizedParentId == null) {
       return name;
     }
 
-    const parentCategory = await this.findRawOne(parentId);
+    const parentCategory = await this.findRawOne(normalizedParentId);
 
     if (!parentCategory) {
       return name;
@@ -152,7 +176,10 @@ export class ProductCategoriesRepository {
         continue;
       }
 
-      const completeName = await this.buildCompleteName(child.name, child.parentId);
+      const completeName = await this.buildCompleteName(
+        child.name,
+        this.normalizeParentId(child.parentId),
+      );
 
       await this.db
         .update(productCategories)
@@ -180,6 +207,7 @@ export class ProductCategoriesRepository {
   ): ProductCategory {
     return {
       ...category,
+      parentId: this.normalizeParentId(category.parentId),
       completeName,
     };
   }
@@ -188,11 +216,13 @@ export class ProductCategoriesRepository {
     category: ProductCategoryRow,
     visited: Set<number>,
   ): Promise<string> {
-    if (category.parentId == null) {
+    const parentId = this.normalizeParentId(category.parentId);
+
+    if (parentId == null) {
       return category.name;
     }
 
-    const parentCategory = await this.findRawOne(category.parentId);
+    const parentCategory = await this.findRawOne(parentId);
 
     if (!parentCategory || visited.has(parentCategory.id)) {
       return category.name;
@@ -213,6 +243,10 @@ export class ProductCategoriesRepository {
   ): Promise<void> {
     if (parentId == null) {
       return;
+    }
+
+    if (!this.isValidId(parentId)) {
+      throw new BadRequestException('Parent category id must be a valid integer.');
     }
 
     if (currentCategoryId !== null && parentId === currentCategoryId) {
@@ -236,7 +270,44 @@ export class ProductCategoriesRepository {
       }
 
       const parentCategory = await this.findRawOne(nextParentId);
-      nextParentId = parentCategory?.parentId ?? null;
+      nextParentId = this.normalizeParentId(parentCategory?.parentId);
     }
+  }
+
+  private normalizeParentId(parentId: number | null | undefined): number | null {
+    return this.isValidId(parentId) ? parentId : null;
+  }
+
+  private isValidId(id: number | null | undefined): id is number {
+    return typeof id === 'number' && Number.isSafeInteger(id) && id > 0;
+  }
+
+  private async ensureSchema() {
+    this.schemaReady ??= this.applySchemaPatch();
+    return this.schemaReady;
+  }
+
+  private async applySchemaPatch() {
+    await this.db.execute(
+      sql`ALTER TABLE "product_categories" ADD COLUMN IF NOT EXISTS "complete_name" text`,
+    );
+    await this.db.execute(
+      sql`CREATE SEQUENCE IF NOT EXISTS "product_categories_id_seq" OWNED BY "product_categories"."id"`,
+    );
+    await this.db.execute(
+      sql`ALTER TABLE "product_categories" ALTER COLUMN "id" SET DEFAULT nextval('"product_categories_id_seq"'::regclass)`,
+    );
+    await this.db.execute(
+      sql`SELECT setval('"product_categories_id_seq"'::regclass, COALESCE((SELECT MAX("id") FROM "product_categories"), 0) + 1, false)`,
+    );
+    await this.db.execute(
+      sql`ALTER TABLE "product_categories" ALTER COLUMN "created_at" SET DEFAULT now()`,
+    );
+    await this.db.execute(
+      sql`ALTER TABLE "product_categories" ALTER COLUMN "updated_at" SET DEFAULT now()`,
+    );
+    await this.db.execute(
+      sql`ALTER TABLE "product_categories" ALTER COLUMN "is_archived" SET DEFAULT false`,
+    );
   }
 }
